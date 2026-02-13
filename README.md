@@ -1,93 +1,343 @@
-# Document Q&A System with Llama3
+# RAG System with OpenAI API and Embeddings
 
-A Streamlit-based application that enables users to ask questions about PDF documents using AI-powered document retrieval and question answering.
+A complete implementation of a Retrieval-Augmented Generation (RAG) system using OpenAI's API and embeddings.
 
-## Features
+## 🚀 Quick Start
 
-- **PDF Document Processing**: Automatically loads and processes PDF files from a specified directory
-- **AI-Powered Q&A**: Uses Llama3-8b model via Groq API for intelligent question answering
-- **Vector Search**: Implements FAISS vector database for fast document similarity search
-- **Source Transparency**: Shows relevant document chunks used to generate answers
-- **Session Persistence**: Caches vector embeddings to avoid reprocessing documents
+### 1. Installation
 
-## Technology Stack
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-- **Frontend**: Streamlit
-- **Language Model**: Llama3-8b-8192 (via Groq API)
-- **Embeddings**: OpenAI Embeddings
-- **Vector Database**: FAISS
-- **Document Processing**: LangChain with PyPDF loader
-- **PDF Processing**: PyPDF2
-
-## Prerequisites
-
-- Python 3.7+
-- OpenAI API key
-- Groq API key
-
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Create a `.env` file in the project root with your API keys:
-   ```
-   OPENAI_API_KEY=your_openai_api_key_here
-   GROQ_API_KEY=your_groq_api_key_here
-   ```
-
-4. Create a `science_direct` folder in the project directory and place your PDF files there
-
-## Usage
-
-1. Run the Streamlit application:
-   ```bash
-   streamlit run app.py
-   ```
-
-2. Click "Documents Embedding" to process and embed your PDF documents (one-time setup)
-
-3. Enter your question in the text input field
-
-4. View the AI-generated answer based on your documents
-
-5. Expand "Document Similarity Search" to see the relevant document chunks that were used
-
-## How It Works
-
-1. **Document Loading**: Loads PDF files from the `science_direct` directory
-2. **Text Splitting**: Breaks documents into 1000-character chunks with 200-character overlap
-3. **Vector Embedding**: Converts text chunks to vector embeddings using OpenAI's embedding model
-4. **Storage**: Stores embeddings in FAISS vector database for fast retrieval
-5. **Query Processing**: When a question is asked, finds the most relevant document chunks
-6. **Answer Generation**: Uses Llama3 to generate contextual answers based on retrieved chunks
-
-## Configuration
-
-- **Chunk Size**: 1000 characters
-- **Chunk Overlap**: 200 characters  
-- **Document Limit**: First 20 documents from the directory
-- **Model**: Llama3-8b-8192
-
-## Project Structure
-
-```
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-├── .env               # API keys (create this file)
-└── science_direct/    # Directory for PDF documents (create this folder)
+# Set your OpenAI API key
+export OPENAI_API_KEY='your-api-key-here'
 ```
 
-## Performance
+### 2. Basic Usage
 
-The application displays response time for each query to help monitor performance. Vector embeddings are cached in the session state to avoid reprocessing documents on subsequent queries.
+```python
+from rag_system import SimpleRAG
 
-## Limitations
+# Initialize
+rag = SimpleRAG(api_key="your-api-key")
 
-- Only processes PDF files
-- Limited to first 20 documents in the directory
-- Requires internet connection for API calls
-- Answers are constrained to the provided document context only
+# Add documents
+documents = [
+    "Your first document text here...",
+    "Your second document text here..."
+]
+rag.add_documents(documents)
+
+# Query
+result = rag.query("What is...?")
+print(result['answer'])
+```
+
+## 📚 How RAG Works
+
+```
+User Query → Embedding → Vector Search → Retrieve Top-K Docs → 
+→ Build Context → Send to LLM → Generate Answer
+```
+
+### Key Components:
+
+1. **Document Chunking**: Split large documents into manageable pieces
+2. **Embeddings**: Convert text to numerical vectors (1536 dimensions)
+3. **Vector Search**: Find semantically similar documents using cosine similarity
+4. **Context Building**: Combine retrieved documents as context
+5. **Generation**: Use GPT to generate answers based on context
+
+## 🔧 Two Implementations
+
+### Simple RAG (`rag_system.py`)
+- Best for: Learning, small projects, prototyping
+- Features: Basic chunking, numpy-based search
+- No external dependencies except OpenAI
+
+### Advanced RAG (`advanced_rag.py`)
+- Best for: Production, large datasets
+- Features: FAISS indexing, persistent storage, metadata tracking
+- Requires: FAISS library
+
+## 📖 Detailed Examples
+
+### Example 1: Simple Q&A System
+
+```python
+from rag_system import SimpleRAG
+import os
+
+# Setup
+rag = SimpleRAG(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Add knowledge base
+docs = [
+    """Python is a high-level programming language. 
+    It's known for readability and versatility.""",
+    
+    """JavaScript is used for web development. 
+    It runs in browsers and on servers via Node.js."""
+]
+
+rag.add_documents(docs)
+
+# Ask questions
+result = rag.query("What is Python known for?")
+print(result['answer'])
+# Output: "Python is known for its readability and versatility."
+
+# Check sources
+for source in result['sources']:
+    print(f"Similarity: {source['similarity']:.3f}")
+```
+
+### Example 2: With Persistent Storage
+
+```python
+from advanced_rag import AdvancedRAG
+
+rag = AdvancedRAG(api_key="your-key", storage_path="./knowledge_db")
+
+# First run: Build knowledge base
+documents = ["Document 1...", "Document 2..."]
+metadata = [
+    {"source": "Manual.pdf", "page": 1},
+    {"source": "Manual.pdf", "page": 2}
+]
+
+rag.add_documents(documents, metadata)
+rag.save()  # Save to disk
+
+# Later runs: Load from disk
+rag.load()
+result = rag.query("Your question")
+```
+
+### Example 3: PDF Processing
+
+```python
+from advanced_rag import AdvancedRAG
+import PyPDF2
+
+def load_pdf(filepath):
+    """Extract text from PDF"""
+    with open(filepath, 'rb') as file:
+        pdf = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf.pages:
+            text += page.extract_text()
+    return text
+
+# Load PDF
+pdf_text = load_pdf("document.pdf")
+
+# Add to RAG
+rag = AdvancedRAG(api_key="your-key")
+rag.add_documents(
+    [pdf_text],
+    [{"source": "document.pdf", "type": "pdf"}]
+)
+
+# Query
+result = rag.query("What does the document say about...?")
+```
+
+## ⚙️ Configuration Options
+
+### Embedding Models
+
+```python
+# Cost-effective (default)
+embedding_model = "text-embedding-3-small"  # 1536 dimensions, $0.02/1M tokens
+
+# Higher quality
+embedding_model = "text-embedding-3-large"  # 3072 dimensions, $0.13/1M tokens
+```
+
+### Generation Models
+
+```python
+# Fast and cheap (default)
+model = "gpt-4o-mini"
+
+# Higher quality
+model = "gpt-4o"
+model = "gpt-4-turbo"
+```
+
+### Chunking Parameters
+
+```python
+# Smaller chunks: Better precision, more API calls
+chunk_size = 300
+overlap = 30
+
+# Larger chunks: More context, fewer API calls
+chunk_size = 1000
+overlap = 100
+```
+
+### Search Parameters
+
+```python
+# Retrieve more context (better recall)
+result = rag.query("question", top_k=5)
+
+# Retrieve less context (faster, cheaper)
+result = rag.query("question", top_k=2)
+```
+
+## 💡 Best Practices
+
+### 1. Document Preparation
+- Clean text (remove headers, footers, page numbers)
+- Split long documents into logical sections
+- Include metadata (source, date, author)
+
+### 2. Chunking Strategy
+- Keep chunks between 300-800 characters
+- Use overlap (50-100 chars) to preserve context
+- Don't split mid-sentence
+
+### 3. Query Optimization
+- Use specific questions
+- Include context in your query if needed
+- Experiment with top_k values (2-5 usually optimal)
+
+### 4. Cost Management
+```python
+# Estimate costs
+num_documents = 100
+avg_doc_length = 1000  # characters
+tokens_per_doc = avg_doc_length / 4  # rough estimate
+
+# Embedding cost (text-embedding-3-small)
+embedding_cost = (num_documents * tokens_per_doc) / 1_000_000 * 0.02
+
+# Query cost (gpt-4o-mini)
+# ~$0.15 per 1M input tokens, ~$0.60 per 1M output tokens
+```
+
+## 🐛 Troubleshooting
+
+### "Rate limit exceeded"
+```python
+# Add delay between batches
+import time
+time.sleep(1)  # Wait 1 second between batches
+```
+
+### "Context too long"
+```python
+# Reduce chunk size or top_k
+rag.query("question", top_k=2)  # Use fewer sources
+```
+
+### Poor search results
+```python
+# Try different embedding model
+rag.embedding_model = "text-embedding-3-large"
+
+# Increase top_k
+result = rag.query("question", top_k=5)
+
+# Improve document quality (remove noise, better chunking)
+```
+
+## 📊 Performance Tips
+
+1. **Use FAISS for large datasets** (>10,000 chunks)
+2. **Batch operations** when adding many documents
+3. **Cache embeddings** to avoid regenerating
+4. **Monitor token usage** to control costs
+5. **Use async/await** for concurrent queries (advanced)
+
+## 🔍 Advanced Features
+
+### Hybrid Search (Keyword + Semantic)
+
+```python
+def hybrid_search(query, documents, top_k=5):
+    # Get semantic results
+    semantic_results = rag.search(query, top_k=top_k*2)
+    
+    # Get keyword results (simple implementation)
+    keywords = query.lower().split()
+    keyword_scores = []
+    for doc in documents:
+        score = sum(word in doc.lower() for word in keywords)
+        keyword_scores.append(score)
+    
+    # Combine scores (normalize and weight)
+    # ... implementation details
+    
+    return combined_results
+```
+
+### Re-ranking
+
+```python
+# Use a re-ranking model after initial retrieval
+from sentence_transformers import CrossEncoder
+
+reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+# Get initial results
+results = rag.search(query, top_k=10)
+
+# Re-rank
+pairs = [[query, r['text']] for r in results]
+scores = reranker.predict(pairs)
+
+# Sort by new scores
+reranked = sorted(zip(results, scores), 
+                  key=lambda x: x[1], 
+                  reverse=True)[:3]
+```
+
+## 📝 API Key Setup
+
+### Option 1: Environment Variable
+```bash
+export OPENAI_API_KEY='sk-...'
+```
+
+### Option 2: .env File
+```bash
+# Create .env file
+echo "OPENAI_API_KEY=sk-..." > .env
+
+# Load in Python
+from dotenv import load_dotenv
+load_dotenv()
+```
+
+### Option 3: Direct in Code (not recommended)
+```python
+rag = SimpleRAG(api_key="sk-...")
+```
+
+## 🎯 Use Cases
+
+- **Customer Support**: Answer questions from documentation
+- **Research Assistant**: Query research papers and articles  
+- **Internal Wiki**: Company knowledge base search
+- **Educational Tools**: Study guides from textbooks
+- **Code Documentation**: Search through code docs and examples
+
+## 📚 Additional Resources
+
+- [OpenAI Embeddings Guide](https://platform.openai.com/docs/guides/embeddings)
+- [FAISS Documentation](https://github.com/facebookresearch/faiss/wiki)
+- [RAG Best Practices](https://www.anthropic.com/index/retrieval-augmented-generation)
+
+## 🤝 Contributing
+
+Feel free to extend these implementations with:
+- More sophisticated chunking strategies
+- Support for more file formats
+- Query expansion techniques
+- Evaluation metrics
+- Web interface
